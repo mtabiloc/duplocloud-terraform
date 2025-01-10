@@ -12,17 +12,6 @@ module "vpc" {
   
   enable_nat_gateway = true
 
-  /*public_subnet_tags = {
-    "Environment" = terraform.workspace
-    "kubernetes.io/role/elb"    = "1"
-    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
-  }
-
-   public_subnet_tags = {
-    "Environment" = terraform.workspace
-    "kubernetes.io/role/elb"    = "1"
-    "kubernetes.io/cluster/${var.cluster_name}" = "shared"
-  }*/
 
   public_subnet_tags = {
     "Environment" = terraform.workspace
@@ -33,12 +22,12 @@ module "vpc" {
 
   private_subnet_tags = {
     "Environment" = terraform.workspace
-    Name                                        = "<Private-subnets"
+    Name                                        = "Private-subnets"
     "kubernetes.io/role/internal-elb"           = 1
     "kubernetes.io/cluster/${var.cluster_name}" = "shared"
   }
   
   tags = {
-    Environment = terraform.workspace  # Etiquetas para organización
+    Environment = terraform.workspace  
   }
 }

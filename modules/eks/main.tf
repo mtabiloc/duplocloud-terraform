@@ -12,6 +12,8 @@ module "eks" {
 
   create_iam_role = true
 
+  enable_irsa = true
+
   #Adds the current caller identity as an administrator via cluster access entry
   enable_cluster_creator_admin_permissions = true
 

@@ -41,9 +41,6 @@ resource "null_resource" "wait_for_cluster" {
 module "k8s" {
   source = "./modules/k8s"
   cluster_name = module.eks.cluster_name
-  cluster_id = module.eks.cluster_id
-  cluster_endpoint                   = module.eks.cluster_endpoint
   aws_region = var.aws_region
-  cluster_certificate_authority_data = base64decode(module.eks.cluster_certificate_authority_data)
   depends_on = [null_resource.wait_for_cluster] 
 }
