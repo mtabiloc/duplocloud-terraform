@@ -1,8 +1,31 @@
 
 
-# Infrastructure as Code with Terraform, AWS CLI, and kubectl
+# Terraform and AWS Assignment Provided by Duplocloud for Knowledge Validation
 
-This project creates a robust cloud infrastructure on AWS using Infrastructure as Code (IaC) principles. Below is a detailed overview of what this code does, prerequisites, and how to use it.
+This project is designed to build a simple Terraform infrastructure on AWS, demonstrating your knowledge of Terraform and AWS. Below is a summary of the project specifications and requirements:
+
+## Project Specifications:
+- Use Terraform version 1.3.3 or higher.
+- You may use any publicly available Terraform modules.
+- The project must be deployable multiple times within a single AWS region to create multiple environments.
+- The project must create the following resources:
+  - VPC
+  - EKS (Elastic Kubernetes Service)
+  - EC2 instance as an EKS worker node
+  - A container running on EKS with a web interface
+  - A load balancer to expose the web interface of the container
+
+## Documentation Requirements:
+- Provide clear documentation that would enable a software developer with limited knowledge in the following areas to successfully deploy the infrastructure:
+  - AWS
+  - Infrastructure as Code (IaC)
+  - General DevOps concepts
+
+## Timeline:
+- The assignment must be delivered within 48 hours.
+
+## How to Submit:
+- Create a public Git repository and share the link.
 
 ---
 
