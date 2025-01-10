@@ -486,24 +486,5 @@ Deploy your workloads or Kubernetes resources:
 ```bash
 kubectl apply -f <resource-file.yaml>
 ```
-
-#### **4.4 Best Practices**
-- Use namespaces to organize resources for different environments.
-- Apply role-based access control (RBAC) for managing access.
-
----
-
-### **Best Practices for IAM and Kubernetes RBAC**
-
-#### **1. IAM Best Practices**
-- Use the **principle of least privilege**: Grant users only the permissions they need.
-- Enable **MFA** for added security.
-- Use **IAM roles** for applications instead of long-term access keys.
-
-#### **2. Kubernetes RBAC Best Practices**
-- Define roles with limited permissions.
-- Use namespaces to isolate resources.
-- Bind roles to specific users or service accounts.
-
 ---
 
