@@ -1,0 +1,49 @@
+# main.tf
+module "vpc" {
+  source = "./modules/vpc"
+  vpc_name                = var.vpc_name
+  vpc_cidr                = var.vpc_cidr
+  cluster_name            = var.cluster_name
+  azs = var.azs
+  private_subnets = var.private_subnets
+  public_subnets = var.public_subnets
+}
+
+module "eks" {
+  source  = "./modules/eks"
+  vpc_id          = module.vpc.vpc_id
+  worker_subnet_ids = module.vpc.private_subnets
+  control_plane_subnet_ids = module.vpc.public_subnets
+  cluster_name    = var.cluster_name
+  cluster_version = var.cluster_version
+  eks_managed_ng_instance_types = var.eks_managed_ng_instance_types
+  eks_managed_ng_optimized_ami = var.eks_managed_ng_optimized_ami
+  eks_managed_ng_min_size = var.eks_managed_ng_min_size
+  eks_managed_ng_max_size = var.eks_managed_ng_max_size
+  eks_managed_ng_desire_size = var.eks_managed_ng_desire_size
+  depends_on      = [module.vpc]
+}
+
+resource "null_resource" "wait_for_cluster" {
+  depends_on = [module.eks]
+
+  provisioner "local-exec" {
+    command = <<EOT
+      until [ "$(aws eks describe-cluster --name ${module.eks.cluster_name} --query 'cluster.status' --output text)" == "ACTIVE" ]; do
+        echo "Waiting for the cluster to be in ACTIVE state..."
+        sleep 30
+      done
+      echo "The cluster is in ACTIVE state. Continuing..."
+    EOT
+  }
+}
+
+module "k8s" {
+  source = "./modules/k8s"
+  cluster_name = module.eks.cluster_name
+  cluster_id = module.eks.cluster_id
+  cluster_endpoint                   = module.eks.cluster_endpoint
+  aws_region = var.aws_region
+  cluster_certificate_authority_data = base64decode(module.eks.cluster_certificate_authority_data)
+  depends_on = [null_resource.wait_for_cluster] 
+}
