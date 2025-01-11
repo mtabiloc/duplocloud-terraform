@@ -5,6 +5,7 @@ crash.log
 
 # Ignore Terraform plan files
 *.tfplan
+*.plan
 
 # Ignore .terraform directory (plugin cache)
 .terraform/
@@ -17,3 +18,4 @@ override.tf.json
 
 # Ignore local .env and other environment-specific files
 .env
+
