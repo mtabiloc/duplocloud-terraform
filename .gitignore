@@ -15,8 +15,5 @@ override.tf.json
 *_override.tf
 *_override.tf.json
 
-# Ignore tfvars files that contain sensitive data (optional, based on your use case)
-
-
 # Ignore local .env and other environment-specific files
 .env
