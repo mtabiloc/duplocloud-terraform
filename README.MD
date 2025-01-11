@@ -119,6 +119,8 @@ This document outlines the structure of the Terraform project and explains the p
 
 ```
 TERRAFORM
+├── files/
+│   ├── iam_policy.json
 ├── environments/
 │   ├── dev/
 │   │   └── terraform.tfvars
@@ -149,6 +151,9 @@ TERRAFORM
 
 ## **Description of Files and Folders**
 
+### **files/**
+- **Purpose:**
+  - Contains IAM policy for the AWS Load Balancer Controller obtained from here https://github.com/kubernetes-sigs/aws-load-balancer-controller/blob/main/docs/install/iam_policy.json
 ### **environments/**
 - **Purpose:**
   - Contains environment-specific configuration files to manage resources in different stages (e.g., development, staging, production).
@@ -243,35 +248,13 @@ The `aws` provider configures access to AWS services:
 ### Key Variable
 - `aws_region`: The AWS region where resources are managed.
 
-## Kubernetes Provider
 
-The `kubernetes` provider is used to authenticate and manage Kubernetes resources in the EKS cluster:
-
-- **Host**: The `host` value is set to the `cluster_endpoint` of the EKS cluster, provided by the EKS module.
-- **Cluster Certificate Authority**: The cluster's certificate authority is decoded from base64 for secure communication with the Kubernetes API.
-- **Token**: The authentication token is retrieved from the `aws_eks_cluster_auth` data source to authenticate the session.
-
-## Helm Provider
-
-The `helm` provider is used for managing Helm charts within the Kubernetes cluster:
-
-- The `helm` provider uses the same configuration as the Kubernetes provider to authenticate with the cluster.
-
-## EKS Cluster Authentication Data
-
-The `aws_eks_cluster_auth` data source retrieves the authentication token needed to access the EKS cluster:
-
-- **Cluster Name**: The cluster name is provided by the EKS module to authenticate access to the Kubernetes API.
-
-### Key Resource
-- `aws_eks_cluster_auth`: Retrieves the authentication token used to interact with the EKS cluster.
 
 ## Summary
 
 This configuration sets up the required providers to manage AWS, Kubernetes, and Helm resources. It ensures Terraform can authenticate and manage infrastructure in AWS (for EKS) and Kubernetes (for workloads), enabling smooth operations and provisioning.
 
 By using the authentication token and certificate, secure communication between Terraform and the cloud services is ensured. This setup simplifies the management of both infrastructure and Kubernetes workloads in a cloud-native environment.
-
 
 ---
 
@@ -441,27 +424,201 @@ These variables configure the EKS cluster, including the cluster's name, Kuberne
 - **Value**: `2`
 
 
+# Terraform Workspaces and Stage Management for Environments
 
-#### **3.2 Apply Terraform for a Specific Environment**
-Switch to the appropriate workspace and apply the configuration:
-```bash
-terraform workspace select dev
-terraform apply -var-file="environments/dev/terraform.tfvars"
-```
+This project uses Terraform to manage infrastructure on AWS, segmented by different environments (e.g., `dev`, `staging`, `prod`) using **workspaces**. Within each workspace, operations are divided into **2 stages**: the creation of basic infrastructure and the configuration of Kubernetes resources.
 
-#### **3.3 Manage Other Environments**
-For staging or production, repeat the process using the respective `.tfvars` files:
-```bash
-terraform workspace select staging
-terraform apply -var-file="environments/staging/terraform.tfvars"
-```
+## Prerequisites
 
-#### **3.4 Destroy Resources**
-To remove resources from an environment:
-```bash
-terraform workspace select dev
-terraform destroy -var-file="environments/dev/terraform.tfvars"
-```
+- Terraform installed.
+- AWS CLI configured with the correct credentials.
+
+## Module Structure
+
+This project is divided into several modules:
+
+- **vpc**: Creates the VPC and networking infrastructure.
+- **eks**: Creates the EKS cluster and related configuration.
+- **k8s**: Configures Kubernetes resources, such as deployments, services, etc.
+
+## Workspaces
+
+**Workspaces** in Terraform allow managing multiple environments within a single project. Each **workspace** represents a different environment, and within each workspace, you will have two stages:
+
+1. **Stage 1**: Create basic infrastructure (VPC + EKS).
+2. **Stage 2**: Create Kubernetes resources (K8s).
+
+### Basic Workspace Commands
+
+1. **Create a new workspace** for an environment:
+
+   ```bash
+   terraform workspace new <workspace_name>
+   ```
+
+2. **Switch to an existing workspace**:
+
+   ```bash
+   terraform workspace select <workspace_name>
+   ```
+
+3. **List available workspaces**:
+
+   ```bash
+   terraform workspace list
+   ```
+
+## Creating Output Plans
+
+We will use the `terraform plan -out` command to create output plans for each stage within each environment (workspace).
+
+### Stage 1: Create VPC and EKS
+
+1. Switch to the appropriate workspace for Stage 1 (e.g., `dev`):
+
+   ```bash
+   terraform workspace select dev
+   ```
+
+2. Run the plan for **Stage 1**, which includes the `vpc` and `eks` modules:
+
+   ```bash
+   terraform plan -out=dev_stage1.plan -var-file="environments/dev/terraform.tfvars" -target=module.vpc -target=module.eks
+   ```
+
+3. Apply the generated plan for **Stage 1**:
+
+   ```bash
+   terraform apply dev_stage1.plan
+   ```
+
+### Stage 2: Create Kubernetes Resources (K8s)
+
+1. Run the plan for **Stage 2**, which only applies the `k8s` module:
+
+   ```bash
+   terraform plan -out=dev_stage2.plan -var-file="environments/dev/terraform.tfvars" -target=module.k8s
+   ```
+
+Note: It should be executed after stage1 has finalized.
+
+2. Apply the generated plan for **Stage 2**:
+
+   ```bash
+   terraform apply dev_stage2.plan
+   ```
+
+### Full Process for Staging or Production
+
+For other environments, such as `staging` or `prod`, follow the same procedure, but first select the appropriate workspace.
+
+1. **Switch to the `staging` workspace**:
+
+   ```bash
+   terraform workspace select staging
+   ```
+
+2. **Create the infrastructure for `staging` (Stage 1)**:
+
+   ```bash
+   terraform plan -out=staging_stage1.plan -var-file="environments/staging/terraform.tfvars" -target=module.vpc -target=module.eks
+   terraform apply staging_stage1.plan
+   ```
+
+3. **Create Kubernetes resources for `staging` (Stage 2)**:
+
+   ```bash
+   terraform plan -out=staging_stage2.plan -var-file="environments/staging/terraform.tfvars" -target=module.k8s
+   terraform apply staging_stage2.plan
+   ```
+
+## Resource Destruction
+
+To destroy the resources in each environment (workspace), you should destroy them in order, starting with the more dependent resources (Kubernetes) and then the base infrastructure (VPC + EKS).
+
+### Destroy Stage 2: Kubernetes (K8s)
+
+1. Switch to the environment's workspace (e.g., `dev`):
+
+   ```bash
+   terraform workspace select dev
+   ```
+
+2. Destroy the Kubernetes resources from Stage 2:
+
+   ```bash
+   terraform destroy -var-file="environments/staging/terraform.tfvars" -target=module.k8s
+   ```
+
+### Destroy Stage 1: VPC and EKS
+
+1. Switch to the Stage 1 workspace:
+
+   ```bash
+   terraform workspace select dev
+   ```
+
+2. Destroy the VPC and EKS resources from Stage 1:
+
+   ```bash
+   terraform destroy -var-file="environments/staging/terraform.tfvars" -target=module.vpc -target=module.eks
+   ```
+
+## Command Summary
+
+### Create Plans and Apply Them
+
+1. **Switch to the environment workspace (`dev`, `staging`, `prod`)**:
+
+   ```bash
+   terraform workspace select <workspace_name>
+   ```
+
+2. **Create the plan for Stage 1 (VPC + EKS)**:
+
+   ```bash
+   terraform plan -out=<workspace_name>_stage1.plan -var-file="environments/<workspace_name>/terraform.tfvars" -target=module.vpc -target=module.eks
+   ```
+
+3. **Apply the Stage 1 plan**:
+
+   ```bash
+   terraform apply <workspace_name>_stage1.plan
+   ```
+
+4. **Create the plan for Stage 2 (K8s)**:
+
+   ```bash
+   terraform plan -out=<workspace_name>_stage2.plan -var-file="environments/<workspace_name>/terraform.tfvars" -target=module.k8s
+   ```
+
+5. **Apply the Stage 2 plan**:
+
+   ```bash
+   terraform apply <workspace_name>_stage2.plan
+   ```
+
+### Destroy Resources
+
+1. **Destroy the Kubernetes resources from Stage 2**:
+
+   ```bash
+   terraform destroy -target=module.k8s
+   ```
+
+2. **Destroy the VPC and EKS resources from Stage 1**:
+
+   ```bash
+   terraform destroy -target=module.vpc -target=module.eks
+   ```
+
+---
+
+## Important Notes
+
+- **Order of destruction**: Be sure to destroy the Kubernetes resources (Stage 2) first, and then the base infrastructure (Stage 1), to avoid broken dependencies.
+- **Use of workspaces**: Workspaces allow different environments (`dev`, `staging`, `prod`) to have isolated configurations and resources, but within each one, the flow is handled in two stages.
+- **Resource separation**: Using the `-target` flag, you can specify which modules should be applied or destroyed without affecting the rest of the project.
 
 ---
 
@@ -487,4 +644,3 @@ Deploy your workloads or Kubernetes resources:
 kubectl apply -f <resource-file.yaml>
 ```
 ---
-

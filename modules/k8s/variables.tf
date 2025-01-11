@@ -6,3 +6,13 @@ variable "cluster_name" {
 variable "aws_region" {
   description = "AWS Region"
 }
+
+variable "cluster_endpoint" {
+  description = "EKS cluster endpoint"
+  type        = string
+}
+
+variable "cluster_certificate_authority_data" {
+  description = "cluster_certificate_authority_data"
+  type        = string
+}

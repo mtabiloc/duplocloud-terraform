@@ -24,23 +24,10 @@ module "eks" {
   depends_on      = [module.vpc]
 }
 
-resource "null_resource" "wait_for_cluster" {
-  depends_on = [module.eks]
-
-  provisioner "local-exec" {
-    command = <<EOT
-      until [ "$(aws eks describe-cluster --name ${module.eks.cluster_name} --query 'cluster.status' --output text)" == "ACTIVE" ]; do
-        echo "Waiting for the cluster to be in ACTIVE state..."
-        sleep 30
-      done
-      echo "The cluster is in ACTIVE state. Continuing..."
-    EOT
-  }
-}
-
 module "k8s" {
   source = "./modules/k8s"
   cluster_name = module.eks.cluster_name
+  cluster_endpoint = module.eks.cluster_endpoint
+  cluster_certificate_authority_data = module.eks.cluster_certificate_authority_data
   aws_region = var.aws_region
-  depends_on = [null_resource.wait_for_cluster] 
 }

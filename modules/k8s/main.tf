@@ -1,9 +1,31 @@
 # k8s.tf
+
+provider "kubernetes" {
+  host                   = var.cluster_endpoint
+  cluster_ca_certificate = base64decode(var.cluster_certificate_authority_data)
+  token                  = data.aws_eks_cluster_auth.cluster.token
+}
+
+provider "helm" {
+  kubernetes {
+    host                   = var.cluster_endpoint
+    cluster_ca_certificate = base64decode(var.cluster_certificate_authority_data)
+    token                  = data.aws_eks_cluster_auth.cluster.token
+  }
+}
+
+
 data "aws_caller_identity" "current" {}
+
+
+data "aws_eks_cluster_auth" "cluster" {
+  name = var.cluster_name
+}
 
 data "aws_eks_cluster" "cluster" {
   name = var.cluster_name
 }
+
 
 locals {
   oidc_provider_id = replace(data.aws_eks_cluster.cluster.identity.0.oidc.0.issuer, "https://oidc.eks.${var.aws_region}.amazonaws.com/id/", "")
@@ -11,50 +33,18 @@ locals {
 
 # Create the IAM policy for the AWS Load Balancer Controller
 resource "aws_iam_policy" "aws_lb_controller_policy" {
-  name        = "AWSLoadBalancerControllerIAMPolicy"
-  description = "Policy for AWS Load Balancer Controller"
+  name   = "AWSLoadBalancerControllerIAMPolicy"
+  policy = file("${path.root}/files/iam_policy.json")
+}
 
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect   = "Allow"
-        Action   = [
-          "acm:DescribeCertificate",
-          "acm:ListCertificates",
-          "acm:GetCertificate",
-          "elasticloadbalancing:DescribeLoadBalancers",
-          "elasticloadbalancing:DescribeTargetGroups",
-          "elasticloadbalancing:DescribeListeners",
-          "elasticloadbalancing:CreateTargetGroup",
-          "elasticloadbalancing:CreateListener",
-          "elasticloadbalancing:CreateLoadBalancer",
-          "elasticloadbalancing:RegisterTargets",
-          "elasticloadbalancing:DeregisterTargets",
-          "elasticloadbalancing:ModifyTargetGroup",
-          "elasticloadbalancing:ModifyListener",
-          "elasticloadbalancing:DeleteListener",
-          "elasticloadbalancing:DeleteLoadBalancer",
-          "elasticloadbalancing:DeleteTargetGroup",
-          "ec2:DescribeInstances",
-          "ec2:DescribeSecurityGroups",
-          "ec2:DescribeSubnets",
-          "ec2:DescribeVpcs",
-          "ec2:DescribeTags",
-          "iam:ListInstanceProfiles",
-          "iam:GetRole",
-          "iam:ListRoles",
-          "iam:PassRole"
-        ]
-        Resource = "*"
-      }
-    ]
-  })
+
+resource "random_id" "role_suffix" {
+  byte_length = 8
 }
 
 # Create the IAM role for the AWS Load Balancer Controller
 resource "aws_iam_role" "aws_lb_controller_role" {
-  name               = "aws-load-balancer-controller-role"
+  name = "aws-load-balancer-controller-role-${random_id.role_suffix.hex}"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -86,6 +76,9 @@ resource "kubernetes_service_account" "aws_lb_controller" {
   metadata {
     name      = "aws-load-balancer-controller"
     namespace = "kube-system"
+    annotations = {
+      "eks.amazonaws.com/role-arn" = aws_iam_role.aws_lb_controller_role.arn
+    }
   }
   automount_service_account_token = true
 }
@@ -154,6 +147,12 @@ resource "kubernetes_service" "web_app_service" {
 
   metadata {
     name = "web-app-service"
+    annotations = {
+      "service.beta.kubernetes.io/aws-load-balancer-type" = "external" 
+      "service.beta.kubernetes.io/aws-load-balancer-scheme" = "internet-facing"
+      "alb.ingress.kubernetes.io/scheme" = "internet-facing"  
+      "service.beta.kubernetes.io/aws-load-balancer-controller" = "true"
+    }
   }
 
   spec {
